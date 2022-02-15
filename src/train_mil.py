@@ -265,7 +265,7 @@ def train(args):
           'scheduler': scheduler.state_dict(),
           'step': step,
           'loss': np.mean(dev_loss)
-        }, args.model_dir + '/' + args.dataset + '/' + args.model_name + '.%d.%.2f.%.2f.%.2f' % (step, np.mean(losses), doc_f1, sent_f1))
+        }, args.model_dir + '/' + args.dataset + '/' + args.model_name + '.model' % (step, np.mean(losses), doc_f1, sent_f1))
         losses = []
 
       if step == args.no_train_steps:
@@ -278,7 +278,7 @@ if __name__ == '__main__':
 
   parser.add_argument('-dataset', default='amazon', type=str)
   parser.add_argument('-num_aspects', default=3, type=int)
-  parser.add_argument('-model_name', default='naive', type=str)
+  parser.add_argument('-model_name', default='mil', type=str)
   parser.add_argument('-load_model', default=None, type=str)
 
   parser.add_argument('-train_file', default='train.mil.jsonl', type=str)

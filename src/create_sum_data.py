@@ -21,19 +21,13 @@ def soft_margin(a, b):
   return np.log(1 + np.exp(-a * b)).sum()
 
 
-def soft_margin_list(a_list, b):
-  ret = 0
-  for a in a_list:
-    ret += soft_margin(a, b)
-  return ret
-
-
 def prepare_model(args):
   tokenizer = AutoTokenizer.from_pretrained(args.model_type)
   model = MIL(args)
   model.cuda()
   best_point = torch.load(args.load_model)
   model.load_state_dict(best_point['model'])
+  model.eval()
   return model, tokenizer
 
 
@@ -59,13 +53,13 @@ def create_train_data(args,
 
   # get model
   model, tokenizer = prepare_model(args)
-  model.cuda()
-  model.eval()
 
   dataset_file = 'data/' + args.dataset + '/train.sum.jsonl'
   
   summary_set = set()
   if os.path.exists(dataset_file):
+    # this is to make sure there are no duplicates when
+    # script is ran twice due to an unexpected error.
     f = open(dataset_file, 'r')
     for line in f:
       try:
@@ -247,33 +241,24 @@ def create_train_data(args,
 
 
 def create_aspect_test_data(args,
-                     num_keywords=10):
+                            num_keywords=10):
   # get model
   model, tokenizer = prepare_model(args)
-  model.cuda()
-  model.eval()
 
   # prepare switch map
   switch_map = {}
-  keyword_dirs = os.listdir('data/' + args.dataset + '/keywords')
+  keyword_dirs = os.listdir('seeds/' + args.dataset)
   keyword_dirs = sorted(keyword_dirs)
   for i, file in enumerate(keyword_dirs):
-    f = open('data/' + args.dataset + '/keywords/' + file, 'r')
-    keyword = f.readline().strip().split()[1]
-    f.close()
+    aspect = file[:-4]
     switch = [0] * len(keyword_dirs)
     switch[i] = 1
-    switch_map[keyword] = switch
+    switch_map[aspect] = switch
 
   for split in ['dev', 'test']:
     # obtain data
-    data = []
-
-    f = open('data/' + args.dataset + '/' + split + '.jsonl', 'r')
-    for line in tqdm(f):
-      inst = json.loads(line.strip())
-      data.append(inst)
-
+    f = open('data/' + args.dataset + '/' + split + '.json', 'r')
+    data = json.load(f)
     f.close()
 
     f = open('data/' + args.dataset + '/' + split + '.sum.aspect.jsonl', 'w')
@@ -341,49 +326,50 @@ def create_aspect_test_data(args,
 
       word_switches = [(word, word_switches[word]) for word in word_switches]
 
-      document_switch = switch_map[inst['keywords'][0]]
+      for aspect in switch_map:
+        document_switch = switch_map[aspect]
 
-      random.shuffle(word_switches)
-      random.shuffle(sentence_switches)
+        random.shuffle(word_switches)
+        random.shuffle(sentence_switches)
 
-      # get keywords
-      word_scores = [soft_margin(word_switch[-1], document_switch) for word_switch in word_switches]
-      word_switches = [
-        (word_switch, word_score) 
-        for word_switch, word_score in zip(word_switches, word_scores) 
-        if word_score != 1e9
-      ]
-      word_switches = sorted(word_switches, key=lambda a: a[-1])[:num_keywords]
-      keywords = [word_switch[0][0] for word_switch in word_switches]
+        # get keywords
+        word_scores = [soft_margin(word_switch[-1], document_switch) for word_switch in word_switches]
+        word_switches = [
+          (word_switch, word_score) 
+          for word_switch, word_score in zip(word_switches, word_scores) 
+          if word_score != 1e9
+        ]
+        word_switches = sorted(word_switches, key=lambda a: a[-1])[:num_keywords]
+        keywords = [word_switch[0][0] for word_switch in word_switches]
 
-      # get sentences
-      sentence_scores = [soft_margin(sentence_switch[-1], document_switch) for sentence_switch in sentence_switches]
-      sentence_switches = [
-        (sentence_switch, sentence_score) 
-        for sentence_switch, sentence_score in zip(sentence_switches, sentence_scores) 
-        #if sentence_score != 1e9
-      ]
-      sentence_switches = sorted(sentence_switches, key=lambda a: a[-1])
+        # get sentences
+        sentence_scores = [soft_margin(sentence_switch[-1], document_switch) for sentence_switch in sentence_switches]
+        sentence_switches = [
+          (sentence_switch, sentence_score) 
+          for sentence_switch, sentence_score in zip(sentence_switches, sentence_scores) 
+          #if sentence_score != 1e9
+        ]
+        sentence_switches = sorted(sentence_switches, key=lambda a: a[-1])
 
-      input_length = 0
-      idx = 0
-      new_reviews = []
-      for idx in range(len(sentence_switches)):
-        if input_length > 600:
-          break
-        try:
-          sentence = sentence_switches[idx][0][0]
-        except:
-          continue
-        input_length += len(sentence.split())
-        new_reviews.append(sentence)
+        input_length = 0
+        idx = 0
+        new_reviews = []
+        for idx in range(len(sentence_switches)):
+          if input_length > 600:
+            break
+          try:
+            sentence = sentence_switches[idx][0][0]
+          except:
+            continue
+          input_length += len(sentence.split())
+          new_reviews.append(sentence)
 
-      pair = {}
-      pair['summary'] = inst['summary']
-      pair['reviews'] = new_reviews
-      pair['keywords'] = keywords
-      pair['switch'] = document_switch
-      f.write(json.dumps(pair) + '\n')
+        pair = {}
+        pair['summary'] = [x.lower() for x in inst['summaries'][aspect]]
+        pair['reviews'] = new_reviews
+        pair['keywords'] = keywords
+        pair['switch'] = document_switch
+        f.write(json.dumps(pair) + '\n')
 
     f.close()
 
@@ -399,7 +385,7 @@ def create_general_test_data(args,
     # obtain data
     data = []
 
-    f = open('data/' + args.dataset + '/general_' + split + '.json', 'r')
+    f = open('data/' + args.dataset + '/' + split + '.json', 'r')
     data = json.load(f)
     f.close()
 
@@ -523,9 +509,8 @@ if __name__ == '__main__':
 
   parser.add_argument('-mode', default='train', type=str)
 
-  parser.add_argument('-dataset', default='amazon', type=str)
-  parser.add_argument('-num_aspects', default=18, type=int)
-  parser.add_argument('-model_name', default='naive', type=str)
+  parser.add_argument('-dataset', default='space', type=str)
+  parser.add_argument('-num_aspects', default=6, type=int)
 
   parser.add_argument('-load_model', default=None, type=str)
   parser.add_argument('-model_type', default='distilroberta-base', type=str)

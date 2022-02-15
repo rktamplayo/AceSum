@@ -40,7 +40,7 @@ def train(args):
   dataloader = DataLoader(dataset, batch_size=args.batch_size)
 
   if args.asp_dev_file is None:
-    asp_dev_file = args.data_dir + '/' + args.dataset + '/dev.sum.aspect.jsonl' % args.seed_type
+    asp_dev_file = args.data_dir + '/' + args.dataset + '/dev.sum.aspect.jsonl'
   else:
     asp_dev_file = args.asp_dev_file
   asp_dev_dataset = SummarizationDataset(
@@ -54,7 +54,7 @@ def train(args):
   asp_gold_sums = [[summary.lower() for summary in inst['summary']] for inst in data]
 
   if args.gen_dev_file is None:
-    gen_dev_file = args.data_dir + '/' + args.dataset + '/dev.sum.general.jsonl' % args.seed_type
+    gen_dev_file = args.data_dir + '/' + args.dataset + '/dev.sum.general.jsonl'
   else:
     gen_dev_file = args.gen_dev_file
   gen_dev_dataset = SummarizationDataset(
@@ -249,7 +249,7 @@ def evaluate(args, test_type='general'):
   print('Preparing data...')
 
   if (args.gen_test_file is None and test_type == 'general') or (args.asp_test_file is None and test_type == 'aspect'):
-    test_file = args.data_dir + '/' + args.dataset + '/test.sum.%s.jsonl' % (args.seed_type, test_type)
+    test_file = args.data_dir + '/' + args.dataset + '/test.sum.jsonl'
   elif test_type == 'general':
     test_file = args.gen_test_file
   elif test_type == 'aspect':
@@ -291,7 +291,7 @@ def evaluate(args, test_type='general'):
   rng = np.random.default_rng()
 
   os.makedirs('output/' + args.dataset, exist_ok=True)
-  f = open('output/' + args.dataset + '/' + args.load_model.split('/')[-1] + '.out.' + test_type, 'w')
+  f = open('output/' + args.dataset + '/acesum.' + test_type + '.out', 'w')
   for _, (inp_batch, out_batch, _) in enumerate(tqdm(dataloader)):
     model.eval()
 
@@ -329,11 +329,10 @@ if __name__ == '__main__':
 
   parser.add_argument('-mode', default='train', type=str)
 
-  parser.add_argument('-dataset', default='amazon', type=str)
-  parser.add_argument('-num_aspects', default=18, type=int)
-  parser.add_argument('-model_name', default='naive', type=str)
+  parser.add_argument('-dataset', default='space', type=str)
+  parser.add_argument('-num_aspects', default=6, type=int)
+  parser.add_argument('-model_name', default='sum', type=str)
   parser.add_argument('-load_model', default=None, type=str)
-  parser.add_argument('-seed_type', default='my', type=str)
 
   parser.add_argument('-train_file', default=None, type=str)
   parser.add_argument('-asp_dev_file', default=None, type=str)
@@ -372,7 +371,3 @@ if __name__ == '__main__':
     evaluate(args, 'general')
   elif args.mode == 'eval-aspect':
     evaluate(args, 'aspect')
-  elif args.mode == 'eval-multi':
-    evaluate(args, 'multi')
-  elif args.mode == 'eval-double':
-    evaluate(args, 'double')

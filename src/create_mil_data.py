@@ -8,10 +8,11 @@ def create_data(filedir):
   print(filedir)
 
   # get aspects and keywords
-  files = os.listdir(filedir + '/seeds/')
+  seeds_filedir = 'seeds/' + filedir[5:]
+  files = os.listdir(seeds_filedir)
   keywords_dict = {}
   for file in files:
-    f = open(filedir + '/seeds/' + file, 'r')
+    f = open(seeds_filedir + '/' + file, 'r')
     keywords = []
     for _ in range(5):
       keyword = f.readline().strip().split()[-1]
@@ -51,12 +52,6 @@ def create_data(filedir):
         includes = int(any([keyword in review for keyword in keywords]))
         class_list.append(includes)
       #assert len(class_list) == 3
-
-      # add general class
-      # if any(class_list):
-      #   class_list.append(0)
-      # else:
-      #   class_list.append(1)
 
       # add review to corresponding aspect buckets
       instance_tuple = (sentences, class_list)
@@ -114,10 +109,15 @@ def create_data(filedir):
     print('max text length', max_text_length)
     print(count_dict)
 
-create_data('data/oposum/bag')
-create_data('data/oposum/boots')
-create_data('data/oposum/bt')
-create_data('data/oposum/keyboard')
-create_data('data/oposum/tv')
-create_data('data/oposum/vacuum')
+
+import sys
+filedir = sys.argv[1]
+create_data(filedir)
+
+#create_data('data/oposum/bag')
+#create_data('data/oposum/boots')
+#create_data('data/oposum/bt')
+#create_data('data/oposum/keyboard')
+#create_data('data/oposum/tv')
+#create_data('data/oposum/vacuum')
 #create_data('data/space/')
